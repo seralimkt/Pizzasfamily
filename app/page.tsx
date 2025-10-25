@@ -43,7 +43,7 @@ export default function HomePage() {
             )}
           </div>
           <h1 className="mb-3 text-balance text-5xl font-bold tracking-tight text-foreground md:text-6xl">
-            Las Brasas de San Cristobal
+            Pizzas Family
           </h1>
           <p className="text-balance text-xl text-muted-foreground">Los mejores platillos de la región</p>
         </div>
