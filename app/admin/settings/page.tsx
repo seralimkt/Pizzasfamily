@@ -26,7 +26,7 @@ function SettingsContent() {
 
   const [formData, setFormData] = useState({
     businessName: "Serali Food",
-    whatsappNumber: "573235111621",
+    whatsappNumber: "573117411194",
     deliveryFee: 0,
     primaryColor: "#F4C542",
     secondaryColor: "#E67E22",
@@ -198,7 +198,7 @@ function SettingsContent() {
             <Input
               id="whatsapp"
               type="tel"
-              placeholder="573235111621"
+              placeholder="573117411194"
               value={formData.whatsappNumber}
               onChange={(e) => setFormData({ ...formData, whatsappNumber: e.target.value })}
               required

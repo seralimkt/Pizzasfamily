@@ -2,13 +2,12 @@ import { initializeApp } from "firebase/app"
 import { getFirestore, collection, addDoc, setDoc, doc } from "firebase/firestore"
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCRpF-mK3jrw-g0C4bgTBcMhJDAxV7aD5U",
-  authDomain: "brasas-de-san-cristobal.firebaseapp.com",
-  projectId: "brasas-de-san-cristobal",
-  storageBucket: "brasas-de-san-cristobal.firebasestorage.app",
-  messagingSenderId: "339177347991",
-  appId: "1:339177347991:web:e63387b548c2a5e6a042d2",
-  measurementId: "G-NXLYWPEQRW",
+  apiKey: "AIzaSyDcCVPn8QbvMj6W6AlGfjHOHs9TnUVj1YA",
+  authDomain: "pizzas-family.firebaseapp.com",
+  projectId: "pizzas-family",
+  storageBucket: "pizzas-family.firebasestorage.app",
+  messagingSenderId: "607427601731",
+  appId: "1:607427601731:web:80ff8bf75f118a2bb27bf6",
 }
 
 const app = initializeApp(firebaseConfig)
@@ -22,8 +21,8 @@ async function seedFirestore() {
     console.log("[v0] Creating brand configuration...")
     await setDoc(doc(db, "brandConfig", "main"), {
       businessName: "OwnApp",
-      whatsappNumber: "+573235111621",
-      email: "Brasassancristobal@gmail.com",
+      whatsappNumber: "+573117411194",
+      email: "pizzasfamily123@gmail.com",
       deliveryFee: 30,
       primaryColor: "#F4C542",
       secondaryColor: "#E67E22",
