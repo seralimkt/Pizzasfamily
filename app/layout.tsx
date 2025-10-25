@@ -8,9 +8,9 @@ import { Suspense } from "react"
 import "./globals.css"
 
 export const metadata: Metadata = {
-  title: "Las Brasas de San Cristobal",
+  title: "Pizzas Family",
   description: "Sistema de pedidos en línea",
-  generator: "Las Brasas de San Cristobal",
+  generator: "Pizzas Family",
 }
 
 export default function RootLayout({
