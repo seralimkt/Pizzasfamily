@@ -47,6 +47,14 @@ export interface CartItem {
   }[]
 }
 
+export interface DeliveryZone {
+  id: string
+  name: string
+  price: number
+  active: boolean
+  order: number
+}
+
 export interface Order {
   id: string
   orderNumber: string
@@ -56,6 +64,8 @@ export interface Order {
   customerBirthday?: string // Added optional birthday field (format: YYYY-MM-DD)
   deliveryType: "pickup" | "delivery" | "table"
   deliveryAddress?: string
+  deliveryZoneId?: string // Added zone ID to orders
+  deliveryZoneName?: string // Added zone name to orders
   numberOfPeople?: number
   paymentMethod?: "cash" | "transfer" | "card"
   cashAmount?: number
@@ -90,7 +100,8 @@ export interface BrandConfig {
   accentColor: string
   businessName: string
   whatsappNumber: string
-  deliveryFee: number
+  deliveryFee: number // Deprecated - kept for backwards compatibility
+  deliveryZones?: DeliveryZone[] // Added delivery zones array
   paymentMethods?: {
     cash: boolean
     transfer: boolean

@@ -13,8 +13,9 @@ import { Switch } from "@/components/ui/switch"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { getBrandConfig, updateBrandConfig } from "@/lib/firebase/db"
 import { Spinner } from "@/components/ui/spinner"
-import { CheckCircle2, AlertCircle, X } from "lucide-react"
+import { CheckCircle2, AlertCircle, X, Plus, Trash2, GripVertical } from "lucide-react"
 import Image from "next/image"
+import type { DeliveryZone } from "@/lib/firebase/types"
 
 function SettingsContent() {
   const [loading, setLoading] = useState(true)
@@ -27,7 +28,6 @@ function SettingsContent() {
   const [formData, setFormData] = useState({
     businessName: "Serali Food",
     whatsappNumber: "573117411194",
-    deliveryFee: 0,
     primaryColor: "#F4C542",
     secondaryColor: "#E67E22",
     accentColor: "#C0392B",
@@ -45,6 +45,7 @@ function SettingsContent() {
     emailRequired: false,
     birthdayEnabled: false,
     birthdayRequired: false,
+    deliveryZones: [] as DeliveryZone[], // Added delivery zones
   })
 
   useEffect(() => {
@@ -53,7 +54,6 @@ function SettingsContent() {
         setFormData({
           businessName: config.businessName,
           whatsappNumber: config.whatsappNumber,
-          deliveryFee: config.deliveryFee,
           primaryColor: config.primaryColor,
           secondaryColor: config.secondaryColor,
           accentColor: config.accentColor,
@@ -71,12 +71,38 @@ function SettingsContent() {
           emailRequired: config.customerFields?.emailRequired ?? false,
           birthdayEnabled: config.customerFields?.birthdayEnabled ?? false,
           birthdayRequired: config.customerFields?.birthdayRequired ?? false,
+          deliveryZones: config.deliveryZones || [], // Load zones from config
         })
         setLogoPreview(config.logoUrl || "")
       }
       setLoading(false)
     })
   }, [])
+
+  const addDeliveryZone = () => {
+    const newZone: DeliveryZone = {
+      id: `zone-${Date.now()}`,
+      name: "",
+      price: 0,
+      active: true,
+      order: formData.deliveryZones.length,
+    }
+    setFormData({ ...formData, deliveryZones: [...formData.deliveryZones, newZone] })
+  }
+
+  const updateDeliveryZone = (id: string, updates: Partial<DeliveryZone>) => {
+    setFormData({
+      ...formData,
+      deliveryZones: formData.deliveryZones.map((zone) => (zone.id === id ? { ...zone, ...updates } : zone)),
+    })
+  }
+
+  const removeDeliveryZone = (id: string) => {
+    setFormData({
+      ...formData,
+      deliveryZones: formData.deliveryZones.filter((zone) => zone.id !== id),
+    })
+  }
 
   const handleLogoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -111,10 +137,26 @@ function SettingsContent() {
     setSaving(true)
 
     try {
+      if (formData.deliveryHome) {
+        const activeZones = formData.deliveryZones.filter((z) => z.active)
+        if (activeZones.length === 0) {
+          throw new Error("Debes tener al menos una zona de entrega activa si el servicio a domicilio está habilitado")
+        }
+        for (const zone of activeZones) {
+          if (!zone.name.trim()) {
+            throw new Error("Todas las zonas activas deben tener un nombre")
+          }
+          if (zone.price < 0) {
+            throw new Error("El precio de las zonas no puede ser negativo")
+          }
+        }
+      }
+
       await updateBrandConfig({
         businessName: formData.businessName,
         whatsappNumber: formData.whatsappNumber,
-        deliveryFee: formData.deliveryFee,
+        deliveryFee: 0, // Set to 0 as it's now deprecated
+        deliveryZones: formData.deliveryZones, // Save delivery zones
         primaryColor: formData.primaryColor,
         secondaryColor: formData.secondaryColor,
         accentColor: formData.accentColor,
@@ -146,7 +188,7 @@ function SettingsContent() {
       setTimeout(() => setSuccess(false), 3000)
     } catch (err: any) {
       console.error("Error saving config:", err)
-      setError("Error al guardar la configuración. Intenta nuevamente.")
+      setError(err.message || "Error al guardar la configuración. Intenta nuevamente.")
     } finally {
       setSaving(false)
     }
@@ -206,23 +248,6 @@ function SettingsContent() {
             />
             <p className="text-xs text-muted-foreground">Formato: código de país + número (sin espacios ni guiones)</p>
           </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="deliveryFee">Costo de Envío</Label>
-            <Input
-              id="deliveryFee"
-              type="number"
-              min="0"
-              step="0.01"
-              value={formData.deliveryFee || ""}
-              onChange={(e) => {
-                const value = e.target.value === "" ? 0 : Number.parseFloat(e.target.value)
-                setFormData({ ...formData, deliveryFee: isNaN(value) ? 0 : value })
-              }}
-              required
-              disabled={saving}
-            />
-          </div>
         </CardContent>
       </Card>
 
@@ -272,6 +297,94 @@ function SettingsContent() {
           </div>
         </CardContent>
       </Card>
+
+      {formData.deliveryHome && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Zonas de Entrega</CardTitle>
+            <CardDescription>
+              Configura las zonas de entrega y sus precios. Los clientes deberán seleccionar su zona al hacer el pedido.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {formData.deliveryZones.length === 0 ? (
+              <div className="rounded-lg border border-dashed p-8 text-center">
+                <p className="mb-4 text-sm text-muted-foreground">No hay zonas de entrega configuradas</p>
+                <Button type="button" onClick={addDeliveryZone} size="sm" disabled={saving}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Agregar Primera Zona
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {formData.deliveryZones.map((zone, index) => (
+                  <div key={zone.id} className="flex items-start gap-3 rounded-lg border p-4">
+                    <div className="flex items-center justify-center pt-2">
+                      <GripVertical className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                    <div className="flex-1 space-y-3">
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="space-y-1.5">
+                          <Label htmlFor={`zone-name-${zone.id}`}>Nombre de la Zona</Label>
+                          <Input
+                            id={`zone-name-${zone.id}`}
+                            placeholder="Ej: Zona Centro, Zona Norte"
+                            value={zone.name}
+                            onChange={(e) => updateDeliveryZone(zone.id, { name: e.target.value })}
+                            disabled={saving}
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label htmlFor={`zone-price-${zone.id}`}>Precio de Envío</Label>
+                          <Input
+                            id={`zone-price-${zone.id}`}
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            placeholder="0.00"
+                            value={zone.price || ""}
+                            onChange={(e) =>
+                              updateDeliveryZone(zone.id, {
+                                price: e.target.value === "" ? 0 : Number.parseFloat(e.target.value),
+                              })
+                            }
+                            disabled={saving}
+                          />
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          id={`zone-active-${zone.id}`}
+                          checked={zone.active}
+                          onCheckedChange={(checked) => updateDeliveryZone(zone.id, { active: checked })}
+                          disabled={saving}
+                        />
+                        <Label htmlFor={`zone-active-${zone.id}`} className="text-sm">
+                          Zona activa
+                        </Label>
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => removeDeliveryZone(zone.id)}
+                      disabled={saving}
+                      className="text-destructive hover:bg-destructive/10"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+                <Button type="button" onClick={addDeliveryZone} size="sm" variant="outline" disabled={saving}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Agregar Otra Zona
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>

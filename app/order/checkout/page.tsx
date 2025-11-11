@@ -35,10 +35,11 @@ export default function CheckoutPage() {
   const [formData, setFormData] = useState({
     customerName: "",
     customerPhone: "",
-    customerEmail: "", // Added email field
-    customerBirthday: "", // Added birthday field
+    customerEmail: "",
+    customerBirthday: "",
     deliveryType: "pickup" as "pickup" | "delivery" | "table",
     deliveryAddress: "",
+    deliveryZoneId: "", // Added zone selection
     numberOfPeople: "2",
     customPeople: "",
     paymentMethod: "cash" as "cash" | "transfer" | "card",
@@ -63,11 +64,9 @@ export default function CheckoutPage() {
       reader.onload = (event) => {
         const img = new Image()
         img.onload = () => {
-          // Create canvas to resize image
           const canvas = document.createElement("canvas")
           const ctx = canvas.getContext("2d")
 
-          // Max dimensions to keep file size under 500KB
           const maxWidth = 800
           const maxHeight = 800
           let width = img.width
@@ -89,7 +88,6 @@ export default function CheckoutPage() {
           canvas.height = height
           ctx?.drawImage(img, 0, 0, width, height)
 
-          // Convert to Base64 with compression
           const compressedBase64 = canvas.toDataURL("image/jpeg", 0.7)
           setPaymentProofPreview(compressedBase64)
           setPaymentProofFile(file)
@@ -106,7 +104,6 @@ export default function CheckoutPage() {
     setLoading(true)
 
     try {
-      // Validate form
       if (!formData.customerName.trim()) {
         throw new Error("Por favor ingresa tu nombre")
       }
@@ -130,14 +127,22 @@ export default function CheckoutPage() {
       if (formData.deliveryType === "delivery" && !formData.deliveryAddress.trim()) {
         throw new Error("Por favor ingresa tu dirección de entrega")
       }
+      if (formData.deliveryType === "delivery" && !formData.deliveryZoneId) {
+        throw new Error("Por favor selecciona tu zona de entrega")
+      }
       if (formData.paymentMethod === "transfer" && !paymentProofPreview) {
         throw new Error("Por favor sube el comprobante de pago")
       }
 
-      const deliveryFee = formData.deliveryType === "delivery" ? brandConfig?.deliveryFee || 0 : 0
+      let deliveryFee = 0
+      let selectedZone = null
+      if (formData.deliveryType === "delivery" && formData.deliveryZoneId) {
+        selectedZone = brandConfig?.deliveryZones?.find((z) => z.id === formData.deliveryZoneId)
+        deliveryFee = selectedZone?.price || 0
+      }
+
       const orderTotal = total + deliveryFee
 
-      // Generate order number
       const orderNumber = `ORD-${Date.now().toString().slice(-8)}`
 
       const numberOfPeople =
@@ -154,7 +159,6 @@ export default function CheckoutPage() {
         console.log("[v0] Payment proof stored, size:", paymentProofUrl.length, "bytes")
       }
 
-      // Create order object
       const orderData: Omit<Order, "id" | "createdAt" | "updatedAt"> = {
         orderNumber,
         customerName: formData.customerName.trim(),
@@ -165,6 +169,11 @@ export default function CheckoutPage() {
         ...(formData.deliveryType === "delivery" &&
           formData.deliveryAddress.trim() && {
             deliveryAddress: formData.deliveryAddress.trim(),
+          }),
+        ...(formData.deliveryType === "delivery" &&
+          selectedZone && {
+            deliveryZoneId: selectedZone.id,
+            deliveryZoneName: selectedZone.name,
           }),
         ...(formData.deliveryType === "table" && numberOfPeople && { numberOfPeople }),
         paymentMethod: formData.paymentMethod,
@@ -191,11 +200,9 @@ export default function CheckoutPage() {
         ...(formData.notes.trim() && { notes: formData.notes.trim() }),
       }
 
-      // Save order to Firebase
       const orderId = await createOrder(orderData)
       console.log("[v0] Order created:", orderId)
 
-      // Create complete order object for WhatsApp
       const completeOrder: Order = {
         ...orderData,
         id: orderId,
@@ -203,15 +210,12 @@ export default function CheckoutPage() {
         updatedAt: new Date(),
       }
 
-      // Send to WhatsApp
       const whatsappNumber = brandConfig?.whatsappNumber || "573235111621"
       sendOrderToWhatsApp(completeOrder, whatsappNumber, brandConfig)
 
-      // Clear cart and show success
       clearCart()
       setSuccess(true)
 
-      // Redirect after 3 seconds
       setTimeout(() => {
         router.push("/")
       }, 3000)
@@ -248,11 +252,18 @@ export default function CheckoutPage() {
     )
   }
 
-  const deliveryFee = formData.deliveryType === "delivery" ? brandConfig?.deliveryFee || 0 : 0
+  let deliveryFee = 0
+  if (formData.deliveryType === "delivery" && formData.deliveryZoneId) {
+    const selectedZone = brandConfig?.deliveryZones?.find((z) => z.id === formData.deliveryZoneId)
+    deliveryFee = selectedZone?.price || 0
+  }
+
   const orderTotal = total + deliveryFee
 
   const enabledPaymentMethods = brandConfig?.paymentMethods || { cash: true, transfer: true, card: true }
   const enabledDeliveryTypes = brandConfig?.deliveryTypes || { pickup: true, delivery: true, table: true }
+
+  const activeZones = brandConfig?.deliveryZones?.filter((z) => z.active) || []
 
   return (
     <div className="min-h-screen bg-background pb-32">
@@ -354,7 +365,7 @@ export default function CheckoutPage() {
               <RadioGroup
                 value={formData.deliveryType}
                 onValueChange={(value: "pickup" | "delivery" | "table") =>
-                  setFormData({ ...formData, deliveryType: value })
+                  setFormData({ ...formData, deliveryType: value, deliveryZoneId: "" })
                 }
                 disabled={loading}
               >
@@ -372,7 +383,11 @@ export default function CheckoutPage() {
                     <RadioGroupItem value="delivery" id="delivery" />
                     <Label htmlFor="delivery" className="flex-1 cursor-pointer">
                       <div className="font-semibold">Entrega a domicilio</div>
-                      <div className="text-sm text-muted-foreground">Costo: ${deliveryFee.toFixed(2)}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {formData.deliveryZoneId
+                          ? `Costo: $${deliveryFee.toFixed(2)}`
+                          : "Selecciona tu zona para ver el costo"}
+                      </div>
                     </Label>
                   </div>
                 )}
@@ -388,18 +403,44 @@ export default function CheckoutPage() {
               </RadioGroup>
 
               {formData.deliveryType === "delivery" && (
-                <div className="space-y-2">
-                  <Label htmlFor="address">Dirección de entrega *</Label>
-                  <Textarea
-                    id="address"
-                    placeholder="Calle, número, colonia, referencias..."
-                    value={formData.deliveryAddress}
-                    onChange={(e) => setFormData({ ...formData, deliveryAddress: e.target.value })}
-                    required={formData.deliveryType === "delivery"}
-                    disabled={loading}
-                    className="min-h-[80px]"
-                  />
-                </div>
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="zone">Zona de entrega *</Label>
+                    <Select
+                      value={formData.deliveryZoneId}
+                      onValueChange={(value) => setFormData({ ...formData, deliveryZoneId: value })}
+                      disabled={loading}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecciona tu zona" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {activeZones.length === 0 ? (
+                          <div className="p-2 text-sm text-muted-foreground">No hay zonas disponibles</div>
+                        ) : (
+                          activeZones.map((zone) => (
+                            <SelectItem key={zone.id} value={zone.id}>
+                              {zone.name} - ${zone.price.toFixed(2)}
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="address">Dirección de entrega *</Label>
+                    <Textarea
+                      id="address"
+                      placeholder="Calle, número, colonia, referencias..."
+                      value={formData.deliveryAddress}
+                      onChange={(e) => setFormData({ ...formData, deliveryAddress: e.target.value })}
+                      required={formData.deliveryType === "delivery"}
+                      disabled={loading}
+                      className="min-h-[80px]"
+                    />
+                  </div>
+                </>
               )}
 
               {formData.deliveryType === "table" && (
